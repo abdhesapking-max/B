@@ -4,219 +4,191 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
-// Statik dosyaları servis et
+// Veritabanı yerine geçici hafıza
+const users = new Map(); // email -> {password, verified, verificationCode}
+const rooms = new Map(); // roomCode -> {users: Set}
+
+// Static dosyaları sunmak için
 app.use(express.static('public'));
 
-// Ana sayfa
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Odalar ve mesajlar
-const rooms = new Map();
-
-// Oda kodu oluştur
-function generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 4; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-}
-
+// Socket.io bağlantıları
 io.on('connection', (socket) => {
     console.log('Yeni kullanıcı bağlandı:', socket.id);
-    
-    // Oda oluşturma
+
+    // Kayıt işlemi
+    socket.on('register', (data) => {
+        const { email, password } = data;
+
+        if (users.has(email)) {
+            socket.emit('registerError', 'Bu e-posta zaten kayıtlı!');
+            return;
+        }
+
+        // 6 haneli doğrulama kodu oluştur
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        users.set(email, {
+            password: password,
+            verified: false,
+            verificationCode: verificationCode
+        });
+
+        console.log(`Kayıt: ${email}, Kod: ${verificationCode}`);
+        
+        // Normalde e-posta gönderilir, burada demo için kodu gönderiyoruz
+        socket.emit('registerSuccess', { 
+            email: email,
+            code: verificationCode // DEMO İÇİN - Gerçek uygulamada e-posta ile gönderilir
+        });
+    });
+
+    // Doğrulama işlemi
+    socket.on('verify', (data) => {
+        const { email, code } = data;
+
+        if (!users.has(email)) {
+            socket.emit('verifyError', 'Kullanıcı bulunamadı!');
+            return;
+        }
+
+        const user = users.get(email);
+
+        if (user.verificationCode !== code) {
+            socket.emit('verifyError', 'Yanlış doğrulama kodu!');
+            return;
+        }
+
+        user.verified = true;
+        users.set(email, user);
+        
+        console.log(`Doğrulandı: ${email}`);
+        socket.emit('verifySuccess');
+    });
+
+    // Giriş işlemi
+    socket.on('login', (data) => {
+        const { email, password } = data;
+
+        if (!users.has(email)) {
+            socket.emit('loginError', 'Kullanıcı bulunamadı!');
+            return;
+        }
+
+        const user = users.get(email);
+
+        if (!user.verified) {
+            socket.emit('loginError', 'Lütfen önce e-postanızı doğrulayın!');
+            return;
+        }
+
+        if (user.password !== password) {
+            socket.emit('loginError', 'Yanlış şifre!');
+            return;
+        }
+
+        socket.email = email;
+        console.log(`Giriş: ${email}`);
+        socket.emit('loginSuccess', { email: email });
+    });
+
+    // Oda oluştur
     socket.on('createRoom', (data) => {
-        let roomCode = generateRoomCode();
+        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         
-        // Benzersiz oda kodu olana kadar dene
-        while (rooms.has(roomCode)) {
-            roomCode = generateRoomCode();
-        }
-        
-        // Yeni oda oluştur
         rooms.set(roomCode, {
-            code: roomCode,
-            players: [{
-                id: data.playerId,
-                name: data.playerName,
-                socketId: socket.id
-            }],
-            messages: [],
-            createdAt: Date.now()
+            users: new Set([socket.email])
         });
-        
+
         socket.join(roomCode);
         socket.roomCode = roomCode;
-        socket.playerId = data.playerId;
-        
-        console.log(`Oda oluşturuldu: ${roomCode} - ${data.playerName}`);
-        
-        socket.emit('roomCreated', {
-            roomCode: roomCode,
-            players: rooms.get(roomCode).players
-        });
+
+        console.log(`Oda oluşturuldu: ${roomCode} - ${socket.email}`);
+        socket.emit('roomCreated', { roomCode: roomCode });
     });
-    
-    // Odaya katılma
+
+    // Odaya katıl
     socket.on('joinRoom', (data) => {
-        const roomCode = data.roomCode.toUpperCase();
-        
+        const { roomCode } = data;
+
         if (!rooms.has(roomCode)) {
-            socket.emit('roomNotFound');
-            console.log(`Oda bulunamadı: ${roomCode}`);
+            socket.emit('roomError', 'Oda bulunamadı!');
             return;
         }
-        
+
         const room = rooms.get(roomCode);
-        
-        // Oyuncu zaten odada mı kontrol et
-        const existingPlayer = room.players.find(p => p.id === data.playerId);
-        if (!existingPlayer) {
-            room.players.push({
-                id: data.playerId,
-                name: data.playerName,
-                socketId: socket.id
-            });
-        }
+        room.users.add(socket.email);
         
         socket.join(roomCode);
         socket.roomCode = roomCode;
-        socket.playerId = data.playerId;
+
+        console.log(`Odaya katıldı: ${roomCode} - ${socket.email}`);
         
-        console.log(`${data.playerName} odaya katıldı: ${roomCode}`);
+        // Odadaki diğer kullanıcılara bildir
+        socket.to(roomCode).emit('userJoined', { email: socket.email });
         
-        // Katılan kişiye bilgi gönder
-        socket.emit('roomJoined', {
-            roomCode: roomCode,
-            players: room.players
+        socket.emit('joinedRoom', { roomCode: roomCode });
+    });
+
+    // Mesaj gönder
+    socket.on('sendMessage', (data) => {
+        const { roomCode, message } = data;
+
+        if (!rooms.has(roomCode)) {
+            socket.emit('roomError', 'Oda bulunamadı!');
+            return;
+        }
+
+        console.log(`Mesaj [${roomCode}] ${socket.email}: ${message}`);
+
+        // Odadaki herkese (gönderen dahil) mesajı ilet
+        io.to(roomCode).emit('newMessage', {
+            email: socket.email,
+            message: message,
+            timestamp: new Date()
         });
-        
-        // Eski mesajları gönder
-        if (room.messages.length > 0) {
-            socket.emit('chatHistory', room.messages);
-        }
-        
-        // Diğer oyunculara bildir
-        socket.to(roomCode).emit('playersUpdate', room.players);
     });
-    
-    // Mesaj gönderme
-    socket.on('chatMessage', (data) => {
-        const roomCode = data.roomCode;
-        
-        if (!rooms.has(roomCode)) {
-            console.log(`Mesaj gönderilemedi - Oda bulunamadı: ${roomCode}`);
-            return;
-        }
-        
-        const message = {
-            playerId: data.playerId,
-            playerName: data.playerName,
-            message: data.message,
-            timestamp: Date.now()
-        };
-        
-        // Mesajı kaydet
-        rooms.get(roomCode).messages.push(message);
-        
-        // Tüm odaya gönder
-        io.to(roomCode).emit('chatMessage', message);
-        
-        console.log(`[${roomCode}] ${data.playerName}: ${data.message}`);
-    });
-    
-    // Odadan çıkma
+
+    // Odadan çık
     socket.on('leaveRoom', (data) => {
-        const roomCode = data.roomCode;
-        
-        if (!rooms.has(roomCode)) {
-            console.log(`Odadan çıkılamadı - Oda bulunamadı: ${roomCode}`);
-            return;
+        const { roomCode } = data;
+
+        if (rooms.has(roomCode)) {
+            const room = rooms.get(roomCode);
+            room.users.delete(socket.email);
+
+            // Oda boşsa sil
+            if (room.users.size === 0) {
+                rooms.delete(roomCode);
+                console.log(`Oda silindi: ${roomCode}`);
+            }
         }
-        
-        const room = rooms.get(roomCode);
-        
-        // Oyuncuyu listeden çıkar
-        room.players = room.players.filter(p => p.id !== data.playerId);
-        
+
         socket.leave(roomCode);
-        
-        console.log(`${data.playerId} odadan ayrıldı: ${roomCode}`);
-        
-        // Oda boşsa sil
-        if (room.players.length === 0) {
-            rooms.delete(roomCode);
-            console.log(`Oda silindi (boş kaldı): ${roomCode}`);
-        } else {
-            // Diğer oyunculara bildir
-            io.to(roomCode).emit('playersUpdate', room.players);
-        }
+        socket.roomCode = null;
+        console.log(`Odadan çıktı: ${roomCode} - ${socket.email}`);
     });
-    
+
     // Bağlantı koptuğunda
     socket.on('disconnect', () => {
-        console.log('Kullanıcı bağlantısı koptu:', socket.id);
-        
-        // Kullanıcının olduğu odayı bul
-        if (socket.roomCode && socket.playerId) {
+        console.log('Kullanıcı ayrıldı:', socket.id);
+
+        if (socket.roomCode && rooms.has(socket.roomCode)) {
             const room = rooms.get(socket.roomCode);
-            
-            if (room) {
-                // Oyuncuyu listeden çıkar
-                room.players = room.players.filter(p => p.socketId !== socket.id);
-                
-                console.log(`${socket.playerId} bağlantısı koptu - Odadan çıkarıldı: ${socket.roomCode}`);
-                
-                // Oda boşsa sil
-                if (room.players.length === 0) {
-                    rooms.delete(socket.roomCode);
-                    console.log(`Oda silindi (boş kaldı): ${socket.roomCode}`);
-                } else {
-                    // Diğer oyunculara bildir
-                    io.to(socket.roomCode).emit('playersUpdate', room.players);
-                }
+            room.users.delete(socket.email);
+
+            if (room.users.size === 0) {
+                rooms.delete(socket.roomCode);
             }
         }
     });
 });
 
-// Oda temizleme (Her 1 saatte bir boş odaları sil)
-setInterval(() => {
-    const now = Date.now();
-    let deletedCount = 0;
-    
-    rooms.forEach((room, code) => {
-        // 1 saatten eski ve boş odaları sil
-        if (room.players.length === 0 && (now - room.createdAt) > 3600000) {
-            rooms.delete(code);
-            deletedCount++;
-        }
-    });
-    
-    if (deletedCount > 0) {
-        console.log(`${deletedCount} eski oda temizlendi`);
-    }
-}, 3600000); // Her 1 saat
-
-// Server durumu (her 5 dakikada bir)
-setInterval(() => {
-    console.log(`📊 Aktif oda sayısı: ${rooms.size}`);
-    let totalPlayers = 0;
-    rooms.forEach(room => totalPlayers += room.players.length);
-    console.log(`👥 Toplam oyuncu: ${totalPlayers}`);
-}, 300000); // Her 5 dakika
-
-// Server'ı başlat
 const PORT = process.env.PORT || 3000;
+
 http.listen(PORT, () => {
-    console.log('═══════════════════════════════════════');
-    console.log('🚀 Zahir Chat Sunucusu Başlatıldı!');
-    console.log('═══════════════════════════════════════');
-    console.log(`📡 Sunucu adresi: http://localhost:${PORT}`);
-    console.log(`⏰ Başlangıç zamanı: ${new Date().toLocaleString('tr-TR')}`);
-    console.log('═══════════════════════════════════════');
+    console.log(`Server çalışıyor: http://localhost:${PORT}`);
 });
