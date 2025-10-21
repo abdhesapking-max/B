@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zahir Global Chat</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-tFLBS/CerQ1p6oJIUfzJr3Z4WxYXxnvtqYBhOcPIo5fPAjLnWpLjsKpwrNJYzFVR" crossorigin="anonymous"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .message-enter {
@@ -26,9 +26,27 @@
         #messagesContainer {
             height: calc(100vh - 300px);
         }
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="hidden fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white"></div>
+
     <!-- Login Screen -->
     <div id="loginScreen" class="min-h-screen gradient-bg flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
@@ -68,7 +86,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2 text-center">Yeni Oda Oluştur</h3>
-                    <p class="text-gray-600 text-sm text-center mb-4">Benzersiz bir oda kodu ile yeni sohbet başlat</p>
+                    <p class="text-gray-600 text-sm text-center mb-4">5 haneli benzersiz kod ile oda oluştur</p>
                     <button id="createRoomBtn" class="w-full bg-indigo-500 text-white py-3 rounded-lg font-semibold hover:bg-indigo-600 transition">
                         Oda Oluştur
                     </button>
@@ -80,12 +98,13 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2 text-center">Odaya Katıl</h3>
-                    <p class="text-gray-600 text-sm text-center mb-4">Oda kodunu girerek sohbete katıl</p>
+                    <p class="text-gray-600 text-sm text-center mb-4">5 haneli oda kodunu girerek katıl</p>
                     <form id="joinRoomForm" class="space-y-3">
-                        <input type="text" id="roomCodeInput" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none transition text-center font-mono text-lg uppercase" placeholder="ODA KODU" maxlength="6" required>
+                        <input type="text" id="roomCodeInput" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none transition text-center font-mono text-lg" placeholder="12345" maxlength="5" pattern="[0-9]{5}" required>
                         <button type="submit" class="w-full bg-purple-500 text-white py-3 rounded-lg font-semibold hover:bg-purple-600 transition">
                             Katıl
                         </button>
+                        <div id="joinError" class="hidden text-red-500 text-sm text-center"></div>
                     </form>
                 </div>
             </div>
@@ -110,7 +129,7 @@
                     <div class="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg flex items-center gap-2">
                         <span class="text-sm font-medium">Oda Kodu:</span>
                         <span id="currentRoomCode" class="font-mono font-bold text-lg"></span>
-                        <button id="copyCodeBtn" class="ml-2 p-1 hover:bg-white/20 rounded transition">
+                        <button id="copyCodeBtn" class="ml-2 p-1 hover:bg-white/20 rounded transition" title="Kopyala">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                             </svg>
@@ -134,13 +153,24 @@
 
         <div class="flex-1 max-w-6xl w-full mx-auto p-4 overflow-hidden flex flex-col">
             <div class="flex-1 bg-white rounded-lg shadow-lg p-4 overflow-y-auto mb-4" id="messagesContainer">
-                <div id="messages" class="space-y-3"></div>
+                <div id="messages" class="space-y-3">
+                    <div class="text-center text-gray-400 py-8">
+                        <p>Mesaj geçmişi yok. İlk mesajı sen gönder! 🚀</p>
+                    </div>
+                </div>
             </div>
             
-            <div id="typingIndicator" class="hidden text-sm text-gray-500 mb-2 px-4"></div>
+            <div id="typingIndicator" class="hidden text-sm text-gray-500 mb-2 px-4">
+                <span class="inline-flex items-center gap-1">
+                    <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                    <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                    <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                    <span id="typingText" class="ml-2"></span>
+                </span>
+            </div>
             
             <form id="messageForm" class="bg-white rounded-lg shadow-lg p-4 flex gap-3">
-                <input type="text" id="messageInput" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition" placeholder="Mesajınızı yazın..." required>
+                <input type="text" id="messageInput" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition" placeholder="Mesajınızı yazın..." autocomplete="off" required>
                 <button type="submit" class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-indigo-600 hover:to-purple-600 transition flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -152,47 +182,122 @@
     </div>
 
     <script>
-        // Socket.io bağlantısı - SUNUCU ADRESİNİ DEĞİŞTİR!
-        const socket = io('http://localhost:3000');
+        // ⚠️ ÖNEMLİ: Render backend URL'ini buraya yaz!
+        const BACKEND_URL = 'http://localhost:3000'; // Deploy sonrası: https://SENIN-BACKEND.onrender.com
+        
+        const socket = io(BACKEND_URL, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
+        });
 
         let username = '';
         let currentRoom = '';
         let typingTimer;
+        const typingUsers = new Set();
 
         // Ekran elementleri
         const loginScreen = document.getElementById('loginScreen');
         const lobbyScreen = document.getElementById('lobbyScreen');
         const chatScreen = document.getElementById('chatScreen');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const joinError = document.getElementById('joinError');
+
+        // Bildirim göster
+        function showNotification(message, type = 'info') {
+            connectionStatus.textContent = message;
+            connectionStatus.className = `fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white ${
+                type === 'error' ? 'bg-red-500' : 
+                type === 'success' ? 'bg-green-500' : 
+                type === 'warning' ? 'bg-yellow-500' : 
+                'bg-blue-500'
+            }`;
+            connectionStatus.classList.remove('hidden');
+            
+            setTimeout(() => {
+                connectionStatus.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Bağlantı durumu
+        socket.on('connect', () => {
+            console.log('✅ Socket bağlandı!');
+            showNotification('Bağlantı kuruldu!', 'success');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('❌ Bağlantı hatası:', error);
+            showNotification('Sunucuya bağlanılamıyor...', 'error');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('⚠️ Bağlantı koptu');
+            showNotification('Bağlantı koptu, yeniden bağlanılıyor...', 'warning');
+        });
+
+        socket.on('reconnect', () => {
+            console.log('✅ Yeniden bağlandı!');
+            showNotification('Yeniden bağlandı!', 'success');
+            if (currentRoom && username) {
+                socket.emit('join-room', { roomCode: currentRoom, username });
+            }
+        });
 
         // Login
         document.getElementById('loginForm').addEventListener('submit', (e) => {
             e.preventDefault();
             username = document.getElementById('usernameInput').value.trim();
             if (username) {
+                console.log('✅ Giriş yapıldı:', username);
                 document.getElementById('welcomeUsername').textContent = username;
                 loginScreen.classList.add('hidden');
                 lobbyScreen.classList.remove('hidden');
             }
         });
 
-        // Oda oluştur
+        // Oda oluştur - 5 haneli sayı
         document.getElementById('createRoomBtn').addEventListener('click', () => {
-            const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const roomCode = Math.floor(10000 + Math.random() * 90000).toString();
+            console.log('🆕 Oda oluşturuluyor:', roomCode);
             joinRoom(roomCode);
         });
 
-        // Odaya katıl
+        // Odaya katıl - Validasyon
         document.getElementById('joinRoomForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (roomCode) {
-                joinRoom(roomCode);
+            const roomCodeInput = document.getElementById('roomCodeInput');
+            const roomCode = roomCodeInput.value.trim();
+            
+            // Sadece 5 haneli sayı kontrolü
+            if (!/^\d{5}$/.test(roomCode)) {
+                joinError.textContent = '❌ Oda kodu 5 haneli sayı olmalı!';
+                joinError.classList.remove('hidden');
+                roomCodeInput.classList.add('shake');
+                setTimeout(() => roomCodeInput.classList.remove('shake'), 500);
+                return;
             }
+            
+            joinError.classList.add('hidden');
+            console.log('🚪 Odaya katılınıyor:', roomCode);
+            joinRoom(roomCode);
         });
 
         function joinRoom(roomCode) {
             currentRoom = roomCode;
+            console.log('📤 join-room eventi gönderiliyor:', { roomCode, username });
             socket.emit('join-room', { roomCode, username });
+            
+            // Timeout - 5 saniye içinde cevap gelmezse
+            const timeout = setTimeout(() => {
+                showNotification('Odaya katılırken hata oluştu!', 'error');
+                currentRoom = '';
+            }, 5000);
+            
+            // Room joined gelince timeout'u iptal et
+            socket.once('room-joined', () => {
+                clearTimeout(timeout);
+            });
         }
 
         // Çıkış yap
@@ -200,16 +305,19 @@
             lobbyScreen.classList.add('hidden');
             loginScreen.classList.remove('hidden');
             username = '';
+            document.getElementById('usernameInput').value = '';
         });
 
         // Odadan ayrıl
         document.getElementById('leaveRoomBtn').addEventListener('click', () => {
-            socket.disconnect();
-            socket.connect();
+            console.log('👋 Odadan ayrılınıyor');
+            socket.emit('leave-room', { roomCode: currentRoom, username });
             chatScreen.classList.add('hidden');
             lobbyScreen.classList.remove('hidden');
-            document.getElementById('messages').innerHTML = '';
+            document.getElementById('messages').innerHTML = '<div class="text-center text-gray-400 py-8"><p>Mesaj geçmişi yok. İlk mesajı sen gönder! 🚀</p></div>';
+            document.getElementById('roomCodeInput').value = '';
             currentRoom = '';
+            typingUsers.clear();
         });
 
         // Mesaj gönder
@@ -219,6 +327,7 @@
             const message = messageInput.value.trim();
             
             if (message && currentRoom) {
+                console.log('💬 Mesaj gönderiliyor:', message);
                 socket.emit('send-message', { roomCode: currentRoom, message });
                 messageInput.value = '';
                 socket.emit('stop-typing', { roomCode: currentRoom });
@@ -226,35 +335,57 @@
         });
 
         // Yazıyor göstergesi
-        document.getElementById('messageInput').addEventListener('input', () => {
-            socket.emit('typing', { roomCode: currentRoom });
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                socket.emit('stop-typing', { roomCode: currentRoom });
-            }, 1000);
+        document.getElementById('messageInput').addEventListener('input', (e) => {
+            if (e.target.value.trim() && currentRoom) {
+                socket.emit('typing', { roomCode: currentRoom });
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
+                    socket.emit('stop-typing', { roomCode: currentRoom });
+                }, 1000);
+            }
         });
 
         // Kodu kopyala
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            navigator.clipboard.writeText(currentRoom);
-            const btn = document.getElementById('copyCodeBtn');
-            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-            setTimeout(() => {
-                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>';
-            }, 2000);
+        document.getElementById('copyCodeBtn').addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(currentRoom);
+                const btn = document.getElementById('copyCodeBtn');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                showNotification('Oda kodu kopyalandı!', 'success');
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                }, 2000);
+            } catch (err) {
+                console.error('Kopyalama hatası:', err);
+                showNotification('Kopyalama başarısız!', 'error');
+            }
         });
 
         // Socket olayları
         socket.on('room-joined', ({ roomCode, users }) => {
+            console.log('✅ Odaya katıldı:', roomCode, 'Kullanıcılar:', users);
             lobbyScreen.classList.add('hidden');
             chatScreen.classList.remove('hidden');
             document.getElementById('chatUsername').textContent = username;
             document.getElementById('currentRoomCode').textContent = roomCode;
             document.getElementById('userCount').textContent = users.length;
+            showNotification(`${roomCode} odasına katıldın!`, 'success');
+            
+            // Mesaj alanını temizle
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<div class="text-center text-gray-400 py-8"><p>Sohbet başladı! 🎉</p></div>';
         });
 
         socket.on('new-message', ({ username: sender, message, timestamp }) => {
+            console.log('📨 Yeni mesaj:', sender, message);
             const messagesDiv = document.getElementById('messages');
+            
+            // İlk mesaj ise placeholder'ı kaldır
+            if (messagesDiv.querySelector('.text-gray-400')) {
+                messagesDiv.innerHTML = '';
+            }
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message-enter';
             
@@ -264,7 +395,7 @@
             messageDiv.innerHTML = `
                 <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
                     <div class="max-w-xs lg:max-w-md xl:max-w-lg">
-                        ${!isOwn ? `<p class="text-xs text-gray-600 mb-1 font-semibold">${sender}</p>` : ''}
+                        ${!isOwn ? `<p class="text-xs text-gray-600 mb-1 font-semibold">${escapeHtml(sender)}</p>` : ''}
                         <div class="${isOwn ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' : 'bg-gray-200 text-gray-800'} rounded-2xl px-4 py-2 shadow">
                             <p class="break-words">${escapeHtml(message)}</p>
                             <p class="text-xs ${isOwn ? 'text-indigo-100' : 'text-gray-500'} mt-1 text-right">${time}</p>
@@ -278,18 +409,19 @@
         });
 
         socket.on('user-joined', ({ username: newUser }) => {
+            console.log('👤 Kullanıcı katıldı:', newUser);
             addSystemMessage(`${newUser} odaya katıldı 🎉`);
         });
 
         socket.on('user-left', ({ username: leftUser }) => {
+            console.log('👋 Kullanıcı ayrıldı:', leftUser);
             addSystemMessage(`${leftUser} odadan ayrıldı 👋`);
         });
 
         socket.on('users-update', ({ users }) => {
+            console.log('👥 Kullanıcı listesi güncellendi:', users);
             document.getElementById('userCount').textContent = users.length;
         });
-
-        const typingUsers = new Set();
 
         socket.on('user-typing', ({ username: typingUser }) => {
             typingUsers.add(typingUser);
@@ -303,9 +435,10 @@
 
         function updateTypingIndicator() {
             const indicator = document.getElementById('typingIndicator');
+            const typingText = document.getElementById('typingText');
             if (typingUsers.size > 0) {
                 const users = Array.from(typingUsers).join(', ');
-                indicator.textContent = `${users} yazıyor...`;
+                typingText.textContent = `${users} yazıyor...`;
                 indicator.classList.remove('hidden');
             } else {
                 indicator.classList.add('hidden');
@@ -314,6 +447,12 @@
 
         function addSystemMessage(message) {
             const messagesDiv = document.getElementById('messages');
+            
+            // Placeholder varsa kaldır
+            if (messagesDiv.querySelector('.text-gray-400')) {
+                messagesDiv.innerHTML = '';
+            }
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'text-center text-sm text-gray-500 py-2 message-enter';
             messageDiv.textContent = message;
@@ -326,6 +465,14 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // Enter tuşu ile sadece mesaj gönderme
+        document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('joinRoomForm').dispatchEvent(new Event('submit'));
+            }
+        });
     </script>
 </body>
 </html>
