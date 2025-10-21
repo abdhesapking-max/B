@@ -26,13 +26,6 @@
         #messagesContainer {
             height: calc(100vh - 300px);
         }
-        .pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
         .shake {
             animation: shake 0.5s;
         }
@@ -41,11 +34,15 @@
             25% { transform: translateX(-10px); }
             75% { transform: translateX(10px); }
         }
+        /* Ekran gizleme için güçlü CSS */
+        .hide-screen {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
     <!-- Connection Status -->
-    <div id="connectionStatus" class="hidden fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white"></div>
+    <div id="connectionStatus" class="hide-screen fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white"></div>
 
     <!-- Login Screen -->
     <div id="loginScreen" class="min-h-screen gradient-bg flex items-center justify-center p-4">
@@ -72,7 +69,7 @@
     </div>
 
     <!-- Lobby Screen -->
-    <div id="lobbyScreen" class="hidden min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div id="lobbyScreen" class="hide-screen min-h-screen gradient-bg flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl">
             <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-gray-800 mb-2">Hoş geldin, <span id="welcomeUsername"></span>! 👋</h2>
@@ -104,7 +101,7 @@
                         <button type="submit" class="w-full bg-purple-500 text-white py-3 rounded-lg font-semibold hover:bg-purple-600 transition">
                             Katıl
                         </button>
-                        <div id="joinError" class="hidden text-red-500 text-sm text-center"></div>
+                        <div id="joinError" class="hide-screen text-red-500 text-sm text-center"></div>
                     </form>
                 </div>
             </div>
@@ -118,7 +115,7 @@
     </div>
 
     <!-- Chat Screen -->
-    <div id="chatScreen" class="hidden min-h-screen bg-gray-100 flex flex-col">
+    <div id="chatScreen" class="hide-screen min-h-screen bg-gray-100 flex flex-col">
         <div class="gradient-bg text-white p-4 shadow-lg">
             <div class="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4">
                 <div>
@@ -160,7 +157,7 @@
                 </div>
             </div>
             
-            <div id="typingIndicator" class="hidden text-sm text-gray-500 mb-2 px-4">
+            <div id="typingIndicator" class="hide-screen text-sm text-gray-500 mb-2 px-4">
                 <span class="inline-flex items-center gap-1">
                     <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
                     <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
@@ -204,6 +201,14 @@
         const connectionStatus = document.getElementById('connectionStatus');
         const joinError = document.getElementById('joinError');
 
+        // Ekran göster/gizle fonksiyonları
+        function showScreen(screen) {
+            loginScreen.classList.add('hide-screen');
+            lobbyScreen.classList.add('hide-screen');
+            chatScreen.classList.add('hide-screen');
+            screen.classList.remove('hide-screen');
+        }
+
         // Bildirim göster
         function showNotification(message, type = 'info') {
             connectionStatus.textContent = message;
@@ -213,10 +218,10 @@
                 type === 'warning' ? 'bg-yellow-500' : 
                 'bg-blue-500'
             }`;
-            connectionStatus.classList.remove('hidden');
+            connectionStatus.classList.remove('hide-screen');
             
             setTimeout(() => {
-                connectionStatus.classList.add('hidden');
+                connectionStatus.classList.add('hide-screen');
             }, 3000);
         }
 
@@ -251,34 +256,32 @@
             if (username) {
                 console.log('✅ Giriş yapıldı:', username);
                 document.getElementById('welcomeUsername').textContent = username;
-                loginScreen.classList.add('hidden');
-                lobbyScreen.classList.remove('hidden');
+                showScreen(lobbyScreen);
             }
         });
 
-        // Oda oluştur - 5 haneli sayı
+        // Oda oluştur
         document.getElementById('createRoomBtn').addEventListener('click', () => {
             const roomCode = Math.floor(10000 + Math.random() * 90000).toString();
             console.log('🆕 Oda oluşturuluyor:', roomCode);
             joinRoom(roomCode);
         });
 
-        // Odaya katıl - Validasyon
+        // Odaya katıl
         document.getElementById('joinRoomForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const roomCodeInput = document.getElementById('roomCodeInput');
             const roomCode = roomCodeInput.value.trim();
             
-            // Sadece 5 haneli sayı kontrolü
             if (!/^\d{5}$/.test(roomCode)) {
                 joinError.textContent = '❌ Oda kodu 5 haneli sayı olmalı!';
-                joinError.classList.remove('hidden');
+                joinError.classList.remove('hide-screen');
                 roomCodeInput.classList.add('shake');
                 setTimeout(() => roomCodeInput.classList.remove('shake'), 500);
                 return;
             }
             
-            joinError.classList.add('hidden');
+            joinError.classList.add('hide-screen');
             console.log('🚪 Odaya katılınıyor:', roomCode);
             joinRoom(roomCode);
         });
@@ -288,13 +291,11 @@
             console.log('📤 join-room eventi gönderiliyor:', { roomCode, username });
             socket.emit('join-room', { roomCode, username });
             
-            // Timeout - 5 saniye içinde cevap gelmezse
             const timeout = setTimeout(() => {
                 showNotification('Odaya katılırken hata oluştu!', 'error');
                 currentRoom = '';
             }, 5000);
             
-            // Room joined gelince timeout'u iptal et
             socket.once('room-joined', () => {
                 clearTimeout(timeout);
             });
@@ -302,8 +303,7 @@
 
         // Çıkış yap
         document.getElementById('logoutBtn').addEventListener('click', () => {
-            lobbyScreen.classList.add('hidden');
-            loginScreen.classList.remove('hidden');
+            showScreen(loginScreen);
             username = '';
             document.getElementById('usernameInput').value = '';
         });
@@ -312,8 +312,7 @@
         document.getElementById('leaveRoomBtn').addEventListener('click', () => {
             console.log('👋 Odadan ayrılınıyor');
             socket.emit('leave-room', { roomCode: currentRoom, username });
-            chatScreen.classList.add('hidden');
-            lobbyScreen.classList.remove('hidden');
+            showScreen(lobbyScreen);
             document.getElementById('messages').innerHTML = '<div class="text-center text-gray-400 py-8"><p>Mesaj geçmişi yok. İlk mesajı sen gönder! 🚀</p></div>';
             document.getElementById('roomCodeInput').value = '';
             currentRoom = '';
@@ -365,14 +364,12 @@
         // Socket olayları
         socket.on('room-joined', ({ roomCode, users }) => {
             console.log('✅ Odaya katıldı:', roomCode, 'Kullanıcılar:', users);
-            lobbyScreen.classList.add('hidden');
-            chatScreen.classList.remove('hidden');
+            showScreen(chatScreen);
             document.getElementById('chatUsername').textContent = username;
             document.getElementById('currentRoomCode').textContent = roomCode;
             document.getElementById('userCount').textContent = users.length;
             showNotification(`${roomCode} odasına katıldın!`, 'success');
             
-            // Mesaj alanını temizle
             const messagesDiv = document.getElementById('messages');
             messagesDiv.innerHTML = '<div class="text-center text-gray-400 py-8"><p>Sohbet başladı! 🎉</p></div>';
         });
@@ -381,7 +378,6 @@
             console.log('📨 Yeni mesaj:', sender, message);
             const messagesDiv = document.getElementById('messages');
             
-            // İlk mesaj ise placeholder'ı kaldır
             if (messagesDiv.querySelector('.text-gray-400')) {
                 messagesDiv.innerHTML = '';
             }
@@ -439,16 +435,15 @@
             if (typingUsers.size > 0) {
                 const users = Array.from(typingUsers).join(', ');
                 typingText.textContent = `${users} yazıyor...`;
-                indicator.classList.remove('hidden');
+                indicator.classList.remove('hide-screen');
             } else {
-                indicator.classList.add('hidden');
+                indicator.classList.add('hide-screen');
             }
         }
 
         function addSystemMessage(message) {
             const messagesDiv = document.getElementById('messages');
             
-            // Placeholder varsa kaldır
             if (messagesDiv.querySelector('.text-gray-400')) {
                 messagesDiv.innerHTML = '';
             }
@@ -466,7 +461,7 @@
             return div.innerHTML;
         }
 
-        // Enter tuşu ile sadece mesaj gönderme
+        // Enter tuşu ile form gönder
         document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
