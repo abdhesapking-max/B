@@ -3,88 +3,486 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zahir - Online Chat</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Gerçek Zamanlı Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 500px;
+            padding: 40px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .link {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* Chat Styles */
+        .chat-container {
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .room-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+
+        .message.own {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+        }
+
+        .message.other {
+            background: white;
+            color: #333;
+        }
+
+        .message-sender {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .message-input {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-radius: 0 0 10px 10px;
+            gap: 10px;
+        }
+
+        .message-input input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .message-input button {
+            width: auto;
+            padding: 12px 30px;
+        }
+
+        .room-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .room-btn {
+            padding: 50px 20px;
+            text-align: center;
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .room-btn:hover {
+            background: #f0f0ff;
+            border-style: solid;
+        }
+
+        .room-btn h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
-    <!-- Giriş Ekranı -->
-    <div id="loginScreen" class="screen active">
-        <div class="container">
-            <h1 class="title">💬 ZAHIR</h1>
-            <p class="subtitle">Online Sohbet Platformu</p>
+    <!-- Kayıt Ekranı -->
+    <div id="registerScreen" class="container">
+        <h2>Kayıt Ol</h2>
+        <div id="registerError" class="error hidden"></div>
+        <form id="registerForm">
             <div class="form-group">
-                <input type="text" id="usernameInput" placeholder="İsminizi girin" maxlength="15">
-                <button id="loginBtn" class="btn btn-primary">Giriş Yap</button>
+                <label>E-posta</label>
+                <input type="email" id="regEmail" required>
             </div>
+            <div class="form-group">
+                <label>Şifre</label>
+                <input type="password" id="regPassword" required>
+            </div>
+            <button type="submit">Kayıt Ol</button>
+        </form>
+        <div class="link">
+            Hesabın var mı? <a href="#" id="goToLogin">Giriş Yap</a>
+        </div>
+    </div>
+
+    <!-- Doğrulama Ekranı -->
+    <div id="verifyScreen" class="container hidden">
+        <h2>E-posta Doğrulama</h2>
+        <p style="text-align: center; margin-bottom: 20px; color: #666;">
+            E-postanıza gönderilen 6 haneli kodu girin
+        </p>
+        <div id="verifyError" class="error hidden"></div>
+        <form id="verifyForm">
+            <div class="form-group">
+                <label>Doğrulama Kodu</label>
+                <input type="text" id="verifyCode" maxlength="6" required>
+            </div>
+            <button type="submit">Doğrula</button>
+        </form>
+    </div>
+
+    <!-- Giriş Ekranı -->
+    <div id="loginScreen" class="container hidden">
+        <h2>Giriş Yap</h2>
+        <div id="loginError" class="error hidden"></div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>E-posta</label>
+                <input type="email" id="loginEmail" required>
+            </div>
+            <div class="form-group">
+                <label>Şifre</label>
+                <input type="password" id="loginPassword" required>
+            </div>
+            <button type="submit">Giriş Yap</button>
+        </form>
+        <div class="link">
+            Hesabın yok mu? <a href="#" id="goToRegister">Kayıt Ol</a>
         </div>
     </div>
 
     <!-- Oda Seçim Ekranı -->
-    <div id="roomScreen" class="screen">
-        <div class="container">
-            <h1 class="title">💬 ZAHIR</h1>
-            <p class="subtitle">Hoş geldin, <span id="welcomeName"></span>!</p>
-            
-            <div class="room-options">
-                <button id="createRoomBtn" class="btn btn-primary btn-large">
-                    ➕ Yeni Oda Oluştur
-                </button>
-                
-                <div class="divider">
-                    <span>VEYA</span>
-                </div>
-                
-                <div class="join-room-group">
-                    <input type="text" id="roomCodeInput" placeholder="Oda Kodu (4 hane)" maxlength="4">
-                    <button id="joinRoomBtn" class="btn btn-secondary">Odaya Katıl</button>
-                </div>
+    <div id="roomScreen" class="container hidden">
+        <h2>Chat Odası</h2>
+        <div class="room-actions">
+            <div class="room-btn" id="createRoomBtn">
+                <h3>🏠 Oda Oluştur</h3>
+                <p>Yeni bir oda oluştur</p>
             </div>
-            
-            <button id="backToLoginBtn" class="btn btn-link">← Geri Dön</button>
+            <div class="room-btn" id="joinRoomBtn">
+                <h3>🚪 Odaya Katıl</h3>
+                <p>Kod ile odaya gir</p>
+            </div>
         </div>
-    </div>
-
-    <!-- Bekleme Odası Ekranı -->
-    <div id="lobbyScreen" class="screen">
-        <div class="container">
-            <h1 class="title">💬 Oda Bekleme Alanı</h1>
-            
-            <div class="room-code-box">
-                <p>Oda Kodu:</p>
-                <h2 id="currentRoomCode">----</h2>
-                <button id="copyCodeBtn" class="btn btn-small">📋 Kopyala</button>
+        <div id="roomCodeInput" class="hidden" style="margin-top: 20px;">
+            <div class="form-group">
+                <label>Oda Kodu</label>
+                <input type="text" id="roomCode" placeholder="Oda kodunu girin">
             </div>
-            
-            <div class="players-box">
-                <h3>🎮 Odadaki Oyuncular:</h3>
-                <ul id="playersList"></ul>
-            </div>
-            
-            <button id="startChatBtn" class="btn btn-success btn-large">Sohbeti Başlat</button>
-            <button id="leaveLobbyBtn" class="btn btn-danger">Odadan Çık</button>
+            <button id="joinRoomSubmit">Odaya Katıl</button>
         </div>
     </div>
 
     <!-- Chat Ekranı -->
-    <div id="chatScreen" class="screen">
+    <div id="chatScreen" class="container hidden">
         <div class="chat-container">
-            <div class="chat-header">
-                <h2>💬 Sohbet Odası</h2>
-                <span class="room-code-badge">Oda: <span id="chatRoomCode">----</span></span>
+            <div class="room-header">
+                <div>
+                    <div style="font-size: 18px; font-weight: 600;">Chat Odası</div>
+                    <div id="roomCodeDisplay" style="font-size: 12px; opacity: 0.8;"></div>
+                </div>
+                <button id="leaveRoom" style="width: auto; padding: 8px 20px; background: rgba(255,255,255,0.2);">
+                    Çıkış
+                </button>
             </div>
-            
-            <div class="chat-messages" id="chatMessages"></div>
-            
-            <div class="chat-input-container">
-                <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." maxlength="200">
-                <button id="sendMessageBtn" class="btn btn-primary">Gönder</button>
+            <div class="messages" id="messages"></div>
+            <div class="message-input">
+                <input type="text" id="messageInput" placeholder="Mesajınızı yazın...">
+                <button id="sendMessage">Gönder</button>
             </div>
-            
-            <button id="leaveChatBtn" class="btn btn-danger btn-small">Sohbetten Çık</button>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let currentRoom = null;
+
+        // Ekran geçişleri
+        function showScreen(screenId) {
+            document.querySelectorAll('.container').forEach(el => el.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        // Kayıt
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            
+            socket.emit('register', { email, password });
+        });
+
+        socket.on('registerSuccess', (data) => {
+            currentUser = data.email;
+            showScreen('verifyScreen');
+            alert(`Doğrulama kodu: ${data.code} (Normalde e-postanıza gönderilir)`);
+        });
+
+        socket.on('registerError', (message) => {
+            const errorDiv = document.getElementById('registerError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        });
+
+        // Doğrulama
+        document.getElementById('verifyForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const code = document.getElementById('verifyCode').value;
+            
+            socket.emit('verify', { email: currentUser, code });
+        });
+
+        socket.on('verifySuccess', () => {
+            showScreen('loginScreen');
+            alert('Hesabınız doğrulandı! Giriş yapabilirsiniz.');
+        });
+
+        socket.on('verifyError', (message) => {
+            const errorDiv = document.getElementById('verifyError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        });
+
+        // Giriş
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            socket.emit('login', { email, password });
+        });
+
+        socket.on('loginSuccess', (data) => {
+            currentUser = data.email;
+            showScreen('roomScreen');
+        });
+
+        socket.on('loginError', (message) => {
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        });
+
+        // Oda oluştur
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
+            socket.emit('createRoom', { email: currentUser });
+        });
+
+        socket.on('roomCreated', (data) => {
+            currentRoom = data.roomCode;
+            document.getElementById('roomCodeDisplay').textContent = `Oda Kodu: ${data.roomCode}`;
+            showScreen('chatScreen');
+            addSystemMessage(`Oda oluşturuldu! Kod: ${data.roomCode}`);
+        });
+
+        // Odaya katıl
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            document.getElementById('roomCodeInput').classList.remove('hidden');
+        });
+
+        document.getElementById('joinRoomSubmit').addEventListener('click', () => {
+            const roomCode = document.getElementById('roomCode').value;
+            socket.emit('joinRoom', { email: currentUser, roomCode });
+        });
+
+        socket.on('joinedRoom', (data) => {
+            currentRoom = data.roomCode;
+            document.getElementById('roomCodeDisplay').textContent = `Oda Kodu: ${data.roomCode}`;
+            showScreen('chatScreen');
+            addSystemMessage(`${data.roomCode} odasına katıldınız`);
+        });
+
+        socket.on('roomError', (message) => {
+            alert(message);
+        });
+
+        // Mesaj gönder
+        document.getElementById('sendMessage').addEventListener('click', sendMessage);
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                socket.emit('sendMessage', {
+                    roomCode: currentRoom,
+                    email: currentUser,
+                    message: message
+                });
+                input.value = '';
+            }
+        }
+
+        socket.on('newMessage', (data) => {
+            addMessage(data.email, data.message, data.email === currentUser);
+        });
+
+        socket.on('userJoined', (data) => {
+            addSystemMessage(`${data.email} odaya katıldı`);
+        });
+
+        function addMessage(sender, message, isOwn) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+            messageDiv.innerHTML = `
+                <div class="message-sender">${sender}</div>
+                <div>${message}</div>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.style.textAlign = 'center';
+            messageDiv.style.color = '#999';
+            messageDiv.style.fontSize = '12px';
+            messageDiv.style.margin = '10px 0';
+            messageDiv.textContent = message;
+            messagesDiv.appendChild(messageDiv);
+        }
+
+        // Odadan çık
+        document.getElementById('leaveRoom').addEventListener('click', () => {
+            socket.emit('leaveRoom', { roomCode: currentRoom });
+            currentRoom = null;
+            document.getElementById('messages').innerHTML = '';
+            showScreen('roomScreen');
+        });
+
+        // Ekran geçişleri
+        document.getElementById('goToLogin').addEventListener('click', (e) => {
+            e.preventDefault();
+            showScreen('loginScreen');
+        });
+
+        document.getElementById('goToRegister').addEventListener('click', (e) => {
+            e.preventDefault();
+            showScreen('registerScreen');
+        });
+    </script>
 </body>
 </html>
