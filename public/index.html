@@ -142,6 +142,7 @@
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         class Game {
             constructor() {
@@ -149,13 +150,10 @@
                 this.playerName = '';
                 this.playerId = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 this.isRoomOwner = false;
-                
-                // Socket.io olmadan simülasyon yapıyoruz
-                this.players = [];
-                this.chatMessages = [];
+                this.socket = io(); // Socket.io bağlantısı
                 
                 this.setupEventListeners();
-                this.simulateSocketIO();
+                this.setupSocketIO();
             }
             
             setupEventListeners() {
@@ -185,9 +183,48 @@
                 });
             }
             
-            simulateSocketIO() {
-                // Socket.io olmadan temel işlevleri simüle ediyoruz
-                console.log("Socket.io simülasyonu başlatıldı");
+            setupSocketIO() {
+                // Socket.io event listener'ları
+                this.socket.on('connect', () => {
+                    console.log('Sunucuya bağlandı');
+                });
+                
+                this.socket.on('roomCreated', (data) => {
+                    this.roomCode = data.roomCode;
+                    this.isRoomOwner = true;
+                    this.showGameScreen();
+                    this.updatePlayersList(data.players);
+                });
+                
+                this.socket.on('roomJoined', (data) => {
+                    this.roomCode = data.roomCode;
+                    this.showGameScreen();
+                    this.updatePlayersList(data.players);
+                });
+                
+                this.socket.on('roomNotFound', () => {
+                    alert('Oda bulunamadı!');
+                });
+                
+                this.socket.on('playersUpdate', (players) => {
+                    this.updatePlayersList(players);
+                });
+                
+                this.socket.on('chatMessage', (data) => {
+                    this.addChatMessage(data);
+                });
+                
+                this.socket.on('chatHistory', (messages) => {
+                    messages.forEach(msg => this.addChatMessage(msg));
+                });
+                
+                this.socket.on('playerJoined', (data) => {
+                    this.addSystemMessage(`${data.playerName} odaya katıldı!`);
+                });
+                
+                this.socket.on('playerLeft', (data) => {
+                    this.addSystemMessage(`${data.playerName} odadan ayrıldı!`);
+                });
             }
             
             enterName() {
@@ -210,21 +247,10 @@
             }
             
             createRoom() {
-                // Rastgele oda kodu oluştur
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                let roomCode = '';
-                for (let i = 0; i < 4; i++) {
-                    roomCode += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                
-                this.roomCode = roomCode;
-                this.isRoomOwner = true;
-                
-                // Oyuncu listesini güncelle
-                this.players = [{ id: this.playerId, name: this.playerName }];
-                
-                this.showGameScreen();
-                console.log("Oda oluşturuldu:", this.roomCode);
+                this.socket.emit('createRoom', { 
+                    playerId: this.playerId, 
+                    playerName: this.playerName 
+                });
             }
             
             joinRoom() {
@@ -247,27 +273,18 @@
                 }
                 
                 errorDiv.classList.add('hidden');
-                this.roomCode = code;
-                this.isRoomOwner = false;
                 
-                // Oyuncu listesini güncelle (simülasyon)
-                this.players = [
-                    { id: 'other_1', name: 'Oyuncu1' },
-                    { id: 'other_2', name: 'Oyuncu2' },
-                    { id: this.playerId, name: this.playerName }
-                ];
-                
-                this.showGameScreen();
-                console.log("Odaya katılındı:", this.roomCode);
+                this.socket.emit('joinRoom', { 
+                    roomCode: code,
+                    playerId: this.playerId, 
+                    playerName: this.playerName 
+                });
             }
             
             showGameScreen() {
                 document.getElementById('roomScreen').classList.add('hidden');
                 document.getElementById('gameScreen').classList.remove('hidden');
                 document.getElementById('displayRoomCode').textContent = this.roomCode;
-                
-                // Oyuncu listesini güncelle
-                this.updatePlayersList();
                 
                 // Sohbet mesajlarını temizle
                 document.getElementById('chatMessages').innerHTML = '';
@@ -276,9 +293,9 @@
                 this.addSystemMessage(`${this.playerName} sohbete katıldı!`);
             }
             
-            updatePlayersList() {
+            updatePlayersList(players) {
                 const list = document.getElementById('playersListItems');
-                list.innerHTML = this.players.map(p => {
+                list.innerHTML = players.map(p => {
                     if (p.id === this.playerId) {
                         return `<li><strong>${p.name} (Siz)</strong></li>`;
                     } else {
@@ -293,30 +310,12 @@
                 
                 if (!message || !this.roomCode) return;
                 
-                // Kendi mesajını ekle
-                this.addChatMessage({
+                this.socket.emit('chatMessage', {
+                    roomCode: this.roomCode,
+                    playerId: this.playerId,
                     playerName: this.playerName,
-                    message: message,
-                    timestamp: new Date()
+                    message: message
                 });
-                
-                // Diğer oyuncuların mesajlarını simüle et
-                setTimeout(() => {
-                    const responses = [
-                        "Merhaba!",
-                        "Nasılsın?",
-                        "Bu oda harika!",
-                        "Oyun ne zaman başlıyor?",
-                        "Herkese merhaba!"
-                    ];
-                    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                    
-                    this.addChatMessage({
-                        playerName: 'Oyuncu' + (Math.floor(Math.random() * 2) + 1),
-                        message: randomResponse,
-                        timestamp: new Date()
-                    });
-                }, 1000 + Math.random() * 2000);
                 
                 input.value = '';
             }
@@ -326,7 +325,7 @@
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'chat-message';
                 
-                const time = data.timestamp.toLocaleTimeString('tr-TR', {
+                const time = new Date(data.timestamp).toLocaleTimeString('tr-TR', {
                     hour: '2-digit',
                     minute: '2-digit'
                 });
@@ -351,20 +350,17 @@
             }
             
             leaveRoom() {
-                // Sistem mesajı ekle
-                this.addSystemMessage(`${this.playerName} odadan ayrıldı!`);
+                this.socket.emit('leaveRoom', { 
+                    roomCode: this.roomCode, 
+                    playerId: this.playerId 
+                });
                 
-                // Ekranları sıfırla
-                setTimeout(() => {
-                    document.getElementById('gameScreen').classList.add('hidden');
-                    document.getElementById('roomScreen').classList.remove('hidden');
-                    document.getElementById('playersListItems').innerHTML = '';
-                    document.getElementById('chatMessages').innerHTML = '';
-                    document.getElementById('roomCode').value = '';
-                    this.roomCode = null;
-                    
-                    console.log("Odadan çıkıldı");
-                }, 500);
+                document.getElementById('gameScreen').classList.add('hidden');
+                document.getElementById('roomScreen').classList.remove('hidden');
+                document.getElementById('playersListItems').innerHTML = '';
+                document.getElementById('chatMessages').innerHTML = '';
+                document.getElementById('roomCode').value = '';
+                this.roomCode = null;
             }
         }
         
