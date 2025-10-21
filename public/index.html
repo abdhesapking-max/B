@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZAHIR - Online Multiplayer</title>
+    <title>Zahir - Online Chat</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); overflow: hidden; width: 100vw; height: 100vh; touch-action: none; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); overflow: hidden; width: 100vw; height: 100vh; }
         .hidden { display: none !important; }
         #menuScreen { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; }
         .menu-container { background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 500px; width: 90%; }
@@ -18,7 +18,6 @@
         .btn:hover { transform: translateY(-2px); }
         .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
         .btn-secondary { background: #6c757d; color: white; }
-        .btn-success { background: #28a745; color: white; }
         .btn-danger { background: #dc3545; color: white; }
         .divider { text-align: center; color: #999; margin: 10px 0; }
         .join-room { display: flex; gap: 10px; }
@@ -37,20 +36,27 @@
         .chat-input button { padding: 10px 20px; }
         .room-actions { display: flex; gap: 10px; margin-top: 15px; }
         .room-actions button { flex: 1; }
+        #gameScreen { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .chat-window { width: 80%; max-width: 600px; height: 70vh; background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; }
+        .chat-window h2 { text-align: center; margin-bottom: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .game-chat-messages { flex: 1; overflow-y: auto; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: #f9f9f9; }
+        .game-chat-input { display: flex; gap: 10px; margin-bottom: 15px; }
+        .game-chat-input input { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; }
     </style>
 </head>
 <body>
     <div id="menuScreen">
         <div class="menu-container">
-            <h1 class="game-title">🐍 ZAHIR</h1>
+            <h1 class="game-title">💬 ZAHIR</h1>
             <div class="menu-content">
                 <input type="text" id="playerName" placeholder="İsminizi girin" maxlength="15">
-                <div id="roomOptions">
+                <button class="btn btn-primary" id="enterBtn">Giriş Yap</button>
+                <div id="roomOptions" class="hidden">
                     <button class="btn btn-primary" id="createRoomBtn">Oda Oluştur</button>
                     <div class="divider">VEYA</div>
                     <div class="join-room">
-                        <input type="text" id="roomCode" placeholder="Giriş" maxlength="4">
-                        <button class="btn btn-secondary" id="joinRoomBtn">Odaya Katıl</button>
+                        <input type="text" id="roomCode" placeholder="Oda Kodu" maxlength="4">
+                        <button class="btn btn-secondary" id="joinRoomBtn">Katıl</button>
                     </div>
                 </div>
                 <div id="roomInfo" class="room-info hidden">
@@ -70,14 +76,25 @@
                         </div>
                     </div>
                     <div class="room-actions">
-                        <button class="btn btn-success" id="startGameBtn">Maçı Başlat</button>
                         <button class="btn btn-danger" id="leaveRoomBtn">Odadan Çık</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
+    
+    <div id="gameScreen" class="hidden">
+        <div class="chat-window">
+            <h2>💬 Sohbet Odası</h2>
+            <div class="game-chat-messages" id="gameChatMessages"></div>
+            <div class="game-chat-input">
+                <input type="text" id="gameChatInput" placeholder="Mesaj yaz..." maxlength="100">
+                <button class="btn btn-primary" id="sendGameChatBtn">Gönder</button>
+            </div>
+            <button class="btn btn-danger" id="exitGameBtn">Odadan Çık</button>
+        </div>
+    </div>
+    
     <script src="/socket.io/socket.io.js"></script>
     <script>
         class Game {
@@ -93,14 +110,27 @@
             }
             
             setupEventListeners() {
+                document.getElementById('enterBtn').addEventListener('click', () => this.enterApp());
                 document.getElementById('createRoomBtn').addEventListener('click', () => this.createRoom());
                 document.getElementById('joinRoomBtn').addEventListener('click', () => this.joinRoom());
-                document.getElementById('startGameBtn').addEventListener('click', () => this.startGame());
                 document.getElementById('leaveRoomBtn').addEventListener('click', () => this.leaveRoom());
-                document.getElementById('sendChatBtn').addEventListener('click', () => this.sendChat());
-                document.getElementById('chatInput').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') this.sendChat();
-                });
+                document.getElementById('exitGameBtn').addEventListener('click', () => this.exitGame());
+                
+                this.setupChat();
+                this.setupGameChat();
+            }
+            
+            enterApp() {
+                const name = document.getElementById('playerName').value.trim();
+                if (!name) { 
+                    alert('Lütfen isminizi girin!'); 
+                    return; 
+                }
+                
+                this.playerName = name;
+                document.getElementById('playerName').style.display = 'none';
+                document.getElementById('enterBtn').style.display = 'none';
+                document.getElementById('roomOptions').classList.remove('hidden');
             }
             
             setupSocketIO() {
@@ -127,10 +157,28 @@
                 
                 this.socket.on('chatMessage', (data) => {
                     this.addChatMessage(data);
+                    this.addGameChatMessage(data);
                 });
                 
                 this.socket.on('chatHistory', (messages) => {
-                    messages.forEach(msg => this.addChatMessage(msg));
+                    messages.forEach(msg => {
+                        this.addChatMessage(msg);
+                        this.addGameChatMessage(msg);
+                    });
+                });
+            }
+            
+            setupChat() {
+                document.getElementById('sendChatBtn').addEventListener('click', () => this.sendChat());
+                document.getElementById('chatInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendChat();
+                });
+            }
+
+            setupGameChat() {
+                document.getElementById('sendGameChatBtn').addEventListener('click', () => this.sendGameChat());
+                document.getElementById('gameChatInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendGameChat();
                 });
             }
 
@@ -149,8 +197,42 @@
                 input.value = '';
             }
 
+            sendGameChat() {
+                const input = document.getElementById('gameChatInput');
+                const message = input.value.trim();
+                if (!message || !this.roomCode) return;
+                
+                this.socket.emit('chatMessage', {
+                    roomCode: this.roomCode,
+                    playerId: this.playerId,
+                    playerName: this.playerName,
+                    message: message
+                });
+                
+                input.value = '';
+            }
+
             addChatMessage(data) {
                 const container = document.getElementById('chatMessages');
+                if (!container) return;
+                
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'chat-message';
+                
+                const time = new Date(data.timestamp).toLocaleTimeString('tr-TR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                msgDiv.innerHTML = `<span style="color: #999; font-size: 12px;">${time}</span> <strong>${data.playerName}:</strong> ${data.message}`;
+                container.appendChild(msgDiv);
+                container.scrollTop = container.scrollHeight;
+            }
+
+            addGameChatMessage(data) {
+                const container = document.getElementById('gameChatMessages');
+                if (!container) return;
+                
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'chat-message';
                 
@@ -165,35 +247,24 @@
             }
             
             createRoom() {
-                const name = document.getElementById('playerName').value.trim();
-                if (!name) { 
-                    alert('Lütfen isminizi girin!'); 
-                    return; 
-                }
-                
-                this.playerName = name;
-                
                 this.socket.emit('createRoom', { 
                     playerId: this.playerId, 
-                    playerName: name 
+                    playerName: this.playerName 
                 });
             }
             
             joinRoom() {
-                const name = document.getElementById('playerName').value.trim();
                 const code = document.getElementById('roomCode').value.trim();
                 
-                if (!name || !code) { 
-                    alert('İsim ve oda kodu gerekli!'); 
+                if (!code) { 
+                    alert('Oda kodu gerekli!'); 
                     return; 
                 }
-                
-                this.playerName = name;
                 
                 this.socket.emit('joinRoom', { 
                     roomCode: code,
                     playerId: this.playerId, 
-                    playerName: name 
+                    playerName: this.playerName 
                 });
             }
             
@@ -201,20 +272,16 @@
                 document.getElementById('displayRoomCode').textContent = this.roomCode;
                 document.getElementById('roomInfo').classList.remove('hidden');
                 document.getElementById('roomOptions').classList.add('hidden');
-                if (!this.isRoomOwner) document.getElementById('startGameBtn').style.display = 'none';
+                
+                setTimeout(() => {
+                    document.getElementById('menuScreen').classList.add('hidden');
+                    document.getElementById('gameScreen').classList.remove('hidden');
+                }, 500);
             }
             
             updatePlayersList(players) {
                 const list = document.getElementById('playersListItems');
                 list.innerHTML = players.map(p => `<li>${p.name}</li>`).join('');
-            }
-            
-            startGame() {
-                if (!this.isRoomOwner) return;
-                
-                this.socket.emit('startGame', { 
-                    roomCode: this.roomCode 
-                });
             }
             
             leaveRoom() {
@@ -227,11 +294,15 @@
             }
             
             exitGame() {
+                document.getElementById('gameScreen').classList.add('hidden');
+                document.getElementById('menuScreen').classList.remove('hidden');
                 document.getElementById('roomInfo').classList.add('hidden');
                 document.getElementById('roomOptions').classList.remove('hidden');
-                document.getElementById('playersListItems').innerHTML = '';
+                document.getElementById('playerName').style.display = 'block';
+                document.getElementById('enterBtn').style.display = 'block';
+                
+                document.getElementById('gameChatMessages').innerHTML = '';
                 document.getElementById('chatMessages').innerHTML = '';
-                this.roomCode = null;
             }
         }
         
