@@ -4,230 +4,87 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zahir - Online Chat</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); overflow: hidden; width: 100vw; height: 100vh; }
-        .hidden { display: none !important; }
-        #menuScreen { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; }
-        .menu-container { background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 500px; width: 90%; }
-        .game-title { font-size: 3em; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 30px; }
-        .menu-content { display: flex; flex-direction: column; gap: 20px; }
-        input[type="text"] { padding: 15px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; }
-        input[type="text"]:focus { outline: none; border-color: #667eea; }
-        .btn { padding: 15px 30px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-        .btn:hover { transform: translateY(-2px); }
-        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .divider { text-align: center; color: #999; margin: 10px 0; }
-        .join-room { display: flex; gap: 10px; }
-        .join-room input { flex: 1; }
-        .room-info { background: #f8f9fa; padding: 20px; border-radius: 10px; }
-        .room-code-display { text-align: center; margin-bottom: 20px; }
-        .room-code { font-size: 2em; font-weight: bold; color: #667eea; letter-spacing: 5px; }
-        .players-list h3 { margin-bottom: 10px; color: #333; }
-        .players-list ul { list-style: none; background: white; padding: 10px; border-radius: 5px; max-height: 150px; overflow-y: auto; }
-        .players-list li { padding: 8px; border-bottom: 1px solid #eee; }
-        .room-actions { display: flex; gap: 10px; margin-top: 15px; }
-        .room-actions button { flex: 1; }
-        #gameScreen { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .chat-window { width: 80%; max-width: 600px; height: 70vh; background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; }
-        .chat-window h2 { text-align: center; margin-bottom: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .game-chat-messages { flex: 1; overflow-y: auto; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: #f9f9f9; }
-        .chat-message { margin: 5px 0; font-size: 14px; line-height: 1.4; }
-        .game-chat-input { display: flex; gap: 10px; margin-bottom: 15px; }
-        .game-chat-input input { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; }
-        .game-chat-input input:focus { outline: none; border-color: #667eea; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="menuScreen">
-        <div class="menu-container">
-            <h1 class="game-title">💬 ZAHIR</h1>
-            <div class="menu-content">
-                <div id="nameSection">
-                    <input type="text" id="playerName" placeholder="İsminizi girin" maxlength="15">
-                    <button class="btn btn-primary" onclick="enterApp()">Giriş Yap</button>
-                </div>
-                <div id="roomOptions" class="hidden">
-                    <button class="btn btn-primary" onclick="createRoom()">Oda Oluştur</button>
-                    <div class="divider">VEYA</div>
-                    <div class="join-room">
-                        <input type="text" id="roomCode" placeholder="Oda Kodu" maxlength="4">
-                        <button class="btn btn-secondary" onclick="joinRoom()">Katıl</button>
-                    </div>
-                </div>
-                <div id="roomInfo" class="room-info hidden">
-                    <div class="room-code-display">
-                        <span>Oda Kodu: </span>
-                        <span id="displayRoomCode" class="room-code">----</span>
-                    </div>
-                    <div class="players-list">
-                        <h3>Oyuncular:</h3>
-                        <ul id="playersListItems"></ul>
-                    </div>
-                    <div class="room-actions">
-                        <button class="btn btn-danger" onclick="leaveRoom()">Odadan Çık</button>
-                    </div>
-                </div>
+    <!-- Giriş Ekranı -->
+    <div id="loginScreen" class="screen active">
+        <div class="container">
+            <h1 class="title">💬 ZAHIR</h1>
+            <p class="subtitle">Online Sohbet Platformu</p>
+            <div class="form-group">
+                <input type="text" id="usernameInput" placeholder="İsminizi girin" maxlength="15">
+                <button id="loginBtn" class="btn btn-primary">Giriş Yap</button>
             </div>
         </div>
     </div>
-    
-    <div id="gameScreen" class="hidden">
-        <div class="chat-window">
-            <h2>💬 Sohbet Odası</h2>
-            <div class="game-chat-messages" id="gameChatMessages"></div>
-            <div class="game-chat-input">
-                <input type="text" id="gameChatInput" placeholder="Mesaj yaz..." maxlength="100" onkeypress="if(event.key==='Enter') sendGameChat()">
-                <button class="btn btn-primary" onclick="sendGameChat()">Gönder</button>
+
+    <!-- Oda Seçim Ekranı -->
+    <div id="roomScreen" class="screen">
+        <div class="container">
+            <h1 class="title">💬 ZAHIR</h1>
+            <p class="subtitle">Hoş geldin, <span id="welcomeName"></span>!</p>
+            
+            <div class="room-options">
+                <button id="createRoomBtn" class="btn btn-primary btn-large">
+                    ➕ Yeni Oda Oluştur
+                </button>
+                
+                <div class="divider">
+                    <span>VEYA</span>
+                </div>
+                
+                <div class="join-room-group">
+                    <input type="text" id="roomCodeInput" placeholder="Oda Kodu (4 hane)" maxlength="4">
+                    <button id="joinRoomBtn" class="btn btn-secondary">Odaya Katıl</button>
+                </div>
             </div>
-            <button class="btn btn-danger" onclick="exitGame()">Odadan Çık</button>
+            
+            <button id="backToLoginBtn" class="btn btn-link">← Geri Dön</button>
         </div>
     </div>
-    
+
+    <!-- Bekleme Odası Ekranı -->
+    <div id="lobbyScreen" class="screen">
+        <div class="container">
+            <h1 class="title">💬 Oda Bekleme Alanı</h1>
+            
+            <div class="room-code-box">
+                <p>Oda Kodu:</p>
+                <h2 id="currentRoomCode">----</h2>
+                <button id="copyCodeBtn" class="btn btn-small">📋 Kopyala</button>
+            </div>
+            
+            <div class="players-box">
+                <h3>🎮 Odadaki Oyuncular:</h3>
+                <ul id="playersList"></ul>
+            </div>
+            
+            <button id="startChatBtn" class="btn btn-success btn-large">Sohbeti Başlat</button>
+            <button id="leaveLobbyBtn" class="btn btn-danger">Odadan Çık</button>
+        </div>
+    </div>
+
+    <!-- Chat Ekranı -->
+    <div id="chatScreen" class="screen">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>💬 Sohbet Odası</h2>
+                <span class="room-code-badge">Oda: <span id="chatRoomCode">----</span></span>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages"></div>
+            
+            <div class="chat-input-container">
+                <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." maxlength="200">
+                <button id="sendMessageBtn" class="btn btn-primary">Gönder</button>
+            </div>
+            
+            <button id="leaveChatBtn" class="btn btn-danger btn-small">Sohbetten Çık</button>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        let socket = io();
-        let roomCode = null;
-        let playerName = '';
-        let playerId = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        let isRoomOwner = false;
-        
-        function enterApp() {
-            const name = document.getElementById('playerName').value.trim();
-            if (!name) { 
-                alert('Lütfen isminizi girin!'); 
-                return; 
-            }
-            
-            playerName = name;
-            document.getElementById('nameSection').style.display = 'none';
-            document.getElementById('roomOptions').classList.remove('hidden');
-        }
-        
-        function createRoom() {
-            socket.emit('createRoom', { 
-                playerId: playerId, 
-                playerName: playerName 
-            });
-        }
-        
-        function joinRoom() {
-            const code = document.getElementById('roomCode').value.trim();
-            if (!code) { 
-                alert('Oda kodu gerekli!'); 
-                return; 
-            }
-            
-            socket.emit('joinRoom', { 
-                roomCode: code,
-                playerId: playerId, 
-                playerName: playerName 
-            });
-        }
-        
-        function showRoomUI() {
-            document.getElementById('displayRoomCode').textContent = roomCode;
-            document.getElementById('roomInfo').classList.remove('hidden');
-            document.getElementById('roomOptions').classList.add('hidden');
-            
-            setTimeout(() => {
-                document.getElementById('menuScreen').classList.add('hidden');
-                document.getElementById('gameScreen').classList.remove('hidden');
-            }, 500);
-        }
-        
-        function updatePlayersList(players) {
-            const list = document.getElementById('playersListItems');
-            list.innerHTML = players.map(p => `<li>${p.name}</li>`).join('');
-        }
-        
-        function sendGameChat() {
-            const input = document.getElementById('gameChatInput');
-            const message = input.value.trim();
-            if (!message || !roomCode) return;
-            
-            socket.emit('chatMessage', {
-                roomCode: roomCode,
-                playerId: playerId,
-                playerName: playerName,
-                message: message
-            });
-            
-            input.value = '';
-        }
-        
-        function addGameChatMessage(data) {
-            const container = document.getElementById('gameChatMessages');
-            if (!container) return;
-            
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'chat-message';
-            
-            const time = new Date(data.timestamp).toLocaleTimeString('tr-TR', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            
-            msgDiv.innerHTML = `<span style="color: #999; font-size: 12px;">${time}</span> <strong>${data.playerName}:</strong> ${data.message}`;
-            container.appendChild(msgDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-        
-        function leaveRoom() {
-            socket.emit('leaveRoom', { 
-                roomCode: roomCode, 
-                playerId: playerId 
-            });
-            exitGame();
-        }
-        
-        function exitGame() {
-            document.getElementById('gameScreen').classList.add('hidden');
-            document.getElementById('menuScreen').classList.remove('hidden');
-            document.getElementById('roomInfo').classList.add('hidden');
-            document.getElementById('roomOptions').classList.remove('hidden');
-            document.getElementById('nameSection').style.display = 'block';
-            document.getElementById('gameChatMessages').innerHTML = '';
-        }
-        
-        // Socket.IO event listeners
-        socket.on('roomCreated', (data) => {
-            roomCode = data.roomCode;
-            isRoomOwner = true;
-            showRoomUI();
-            updatePlayersList(data.players);
-        });
-        
-        socket.on('roomJoined', (data) => {
-            roomCode = data.roomCode;
-            showRoomUI();
-            updatePlayersList(data.players);
-        });
-        
-        socket.on('roomNotFound', () => {
-            alert('Oda bulunamadı!');
-        });
-        
-        socket.on('playersUpdate', (players) => {
-            updatePlayersList(players);
-        });
-        
-        socket.on('chatMessage', (data) => {
-            addGameChatMessage(data);
-        });
-        
-        socket.on('chatHistory', (messages) => {
-            messages.forEach(msg => {
-                addGameChatMessage(msg);
-            });
-        });
-        
-        // Enter tuşu ile isim girişi
-        document.getElementById('playerName').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') enterApp();
-        });
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
