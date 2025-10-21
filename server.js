@@ -1,20 +1,26 @@
-// server.js - DÜZELTİLMİŞ VERSİYON
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 
 const app = express();
 app.use(cors());
-app.use(express.static('public'));
 
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: [
+      "https://b-fawn-nine.vercel.app",
+      "http://localhost:3000"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
+});
+
+// Ana sayfa - test için
+app.get('/', (req, res) => {
+  res.send('✅ Zahir Chat Backend Çalışıyor!');
 });
 
 // Odaları ve kullanıcıları saklama
@@ -23,15 +29,13 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('✅ Yeni kullanıcı bağlandı:', socket.id);
 
-  // Odaya katılma
   socket.on('join-room', ({ roomCode, username }) => {
-    console.log(`📥 ${username} ${roomCode} odasına katılmak istiyor...`);
+    console.log(`📥 ${username} ${roomCode} odasına katılıyor...`);
     
     socket.join(roomCode);
     socket.username = username;
     socket.roomCode = roomCode;
 
-    // Oda yoksa oluştur
     if (!rooms.has(roomCode)) {
       rooms.set(roomCode, new Set());
       console.log(`🆕 Yeni oda oluşturuldu: ${roomCode}`);
@@ -40,19 +44,13 @@ io.on('connection', (socket) => {
     rooms.get(roomCode).add(username);
     const users = Array.from(rooms.get(roomCode));
 
-    console.log(`✅ ${username} ${roomCode} odasına katıldı. Toplam kullanıcı: ${users.length}`);
+    console.log(`✅ ${username} ${roomCode} odasına katıldı. Kullanıcılar:`, users);
 
-    // Kullanıcıya oda bilgisi gönder
     socket.emit('room-joined', { roomCode, users });
-
-    // Diğer kullanıcılara bildir
     socket.to(roomCode).emit('user-joined', { username });
-    
-    // Güncel kullanıcı listesi
     io.to(roomCode).emit('users-update', { users });
   });
 
-  // Mesaj gönderme
   socket.on('send-message', ({ roomCode, message }) => {
     console.log(`💬 ${socket.username}: ${message}`);
     
@@ -62,11 +60,9 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString()
     };
     
-    // Odadaki herkese (gönderen dahil) mesajı gönder
     io.to(roomCode).emit('new-message', messageData);
   });
 
-  // Yazıyor bildirimi
   socket.on('typing', ({ roomCode }) => {
     socket.to(roomCode).emit('user-typing', { username: socket.username });
   });
@@ -75,9 +71,9 @@ io.on('connection', (socket) => {
     socket.to(roomCode).emit('user-stop-typing', { username: socket.username });
   });
 
-  // Odadan ayrılma
   socket.on('leave-room', ({ roomCode, username }) => {
-    console.log(`👋 ${username} ${roomCode} odasından ayrılıyor...`);
+    console.log(`👋 ${username} ${roomCode} odasından ayrılıyor`);
+    
     socket.leave(roomCode);
     
     const room = rooms.get(roomCode);
@@ -87,7 +83,7 @@ io.on('connection', (socket) => {
       
       if (room.size === 0) {
         rooms.delete(roomCode);
-        console.log(`🗑️ ${roomCode} odası silindi (boş)`);
+        console.log(`🗑️ ${roomCode} odası silindi`);
       } else {
         io.to(roomCode).emit('users-update', { users });
         socket.to(roomCode).emit('user-left', { username });
@@ -95,7 +91,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Bağlantı kopma
   socket.on('disconnect', () => {
     console.log('❌ Kullanıcı ayrıldı:', socket.id);
     
@@ -107,7 +102,7 @@ io.on('connection', (socket) => {
         
         if (room.size === 0) {
           rooms.delete(socket.roomCode);
-          console.log(`🗑️ ${socket.roomCode} odası silindi (boş)`);
+          console.log(`🗑️ ${socket.roomCode} odası silindi`);
         } else {
           io.to(socket.roomCode).emit('users-update', { users });
           socket.to(socket.roomCode).emit('user-left', { username: socket.username });
@@ -119,6 +114,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server çalışıyor: http://localhost:${PORT}`);
-  console.log(`📱 Tarayıcıda aç ve test et!`);
+  console.log(`🚀 Server çalışıyor: Port ${PORT}`);
 });
